@@ -9,6 +9,10 @@
             name="res"
             type="eu.pretix.libpretixsync.check.TicketCheckProvider.SearchResult" />
 
+        <variable
+            name="answers"
+            type="String" />
+
         <import type="android.view.View" />
         <import type="eu.pretix.libpretixsync.check.TicketCheckProvider.SearchResult.Status" />
     </data>
@@ -98,6 +102,26 @@
             app:layout_constraintEnd_toStartOf="@+id/ivWarning"
             app:layout_constraintStart_toEndOf="@+id/tvOrderCode"
             app:layout_constraintTop_toBottomOf="@+id/tvTicketName" />
+
+        <androidx.constraintlayout.widget.Barrier
+            android:id="@+id/barrierAnswers"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:barrierDirection="bottom"
+            app:constraint_referenced_ids="tvOrderCode,tvAttendeeName,ivWarning" />
+
+        <TextView
+            android:id="@+id/tvAnswers"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:text="@{answers}"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:visibility="@{answers != null &amp;&amp; !answers.isEmpty() ? View.VISIBLE : View.GONE}"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/barrierAnswers" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

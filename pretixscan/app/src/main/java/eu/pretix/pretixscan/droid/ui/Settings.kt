@@ -27,6 +27,7 @@ import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import eu.pretix.libpretixsync.models.db.toModel
 import eu.pretix.libpretixui.android.fragments.ForegroundNoticeDialogFragment
 import eu.pretix.pretixscan.droid.AppConfig
 import eu.pretix.pretixscan.droid.BuildConfig
@@ -186,6 +187,58 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         findPreference<Preference>("gate_back_to_start_timeout")?.isVisible = KioskHardware.isTR51() || KioskHardware.isWA1053T()
+
+        findPreference<Preference>("pref_search_questions")?.setOnPreferenceClickListener {
+            showSearchQuestionsDialog(conf)
+            return@setOnPreferenceClickListener true
+        }
+    }
+
+    private fun showSearchQuestionsDialog(conf: AppConfig) {
+        val app = requireActivity().application as PretixScan
+        val events = conf.eventSelection.map { it.eventSlug }
+        val questions = events
+            .flatMap { slug -> app.db.questionQueries.selectByEventSlug(slug).executeAsList() }
+            .mapNotNull {
+                try {
+                    it.toModel()
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            .sortedWith(compareBy({ it.eventSlug }, { it.position }))
+        if (questions.isEmpty()) {
+            toast(R.string.settings_search_questions_empty)
+            return
+        }
+
+        val labels = questions.map { q ->
+            if (events.size > 1) "${q.question} (${q.eventSlug})" else q.question
+        }.toTypedArray()
+        val disabled = conf.searchDisabledQuestions
+        val checked = BooleanArray(questions.size) { i -> questions[i].serverId !in disabled }
+
+        MaterialAlertDialogBuilder(requireContext()).apply {
+            setTitle(R.string.settings_label_search_questions)
+            setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            setPositiveButton(R.string.ok) { dialog, _ ->
+                // Only update the state of the questions we listed, so settings made for
+                // events that are currently not selected are kept.
+                val newDisabled = conf.searchDisabledQuestions.toMutableSet()
+                questions.forEachIndexed { i, q ->
+                    if (checked[i]) {
+                        newDisabled.remove(q.serverId)
+                    } else {
+                        newDisabled.add(q.serverId)
+                    }
+                }
+                conf.searchDisabledQuestions = newDisabled
+                dialog.dismiss()
+            }
+            setNegativeButton(R.string.cancel) { dialog, _ -> dialog.cancel() }
+        }.create().show()
     }
 
     private fun asset_dialog(@RawRes htmlRes: Int, @StringRes title: Int) {

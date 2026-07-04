@@ -10,6 +10,7 @@ import eu.pretix.libpretixsync.check.CheckException
 import eu.pretix.libpretixsync.check.TicketCheckProvider
 import eu.pretix.pretixscan.droid.AppConfig
 import eu.pretix.pretixscan.droid.PretixScan
+import eu.pretix.libpretixsync.models.db.toModel
 import eu.pretix.pretixscan.droid.databinding.ItemSearchresultBinding
 import org.json.JSONException
 import org.json.JSONObject
@@ -18,6 +19,58 @@ import java.util.Locale
 
 interface SearchResultClickedInterface {
     fun onSearchResultClicked(res: TicketCheckProvider.SearchResult);
+}
+
+/**
+ * A search result together with a human-readable rendering of the answers given to the
+ * questions of this position, for display in the search result list.
+ */
+data class SearchResultEntry(
+    val result: TicketCheckProvider.SearchResult,
+    val answers: String?,
+)
+
+/**
+ * Loads the labels of all questions of the given events from the local database, keyed by the
+ * question's server ID.
+ */
+fun loadQuestionLabels(application: PretixScan, events: Collection<String>): Map<Long, String> {
+    val labels = mutableMapOf<Long, String>()
+    for (event in events) {
+        application.db.questionQueries.selectByEventSlug(event).executeAsList().forEach { q ->
+            val serverId = q.server_id ?: return@forEach
+            try {
+                labels[serverId] = q.toModel().question
+            } catch (e: Exception) {
+                // Skip questions with broken JSON
+            }
+        }
+    }
+    return labels
+}
+
+/**
+ * Renders the answers contained in a position's JSON as "Question: answer" lines, or null if
+ * there are none.
+ */
+fun buildAnswersDisplay(position: JSONObject?, questionLabels: Map<Long, String>): String? {
+    val answers = position?.optJSONArray("answers") ?: return null
+    val lines = mutableListOf<String>()
+    try {
+        for (i in 0 until answers.length()) {
+            val a = answers.getJSONObject(i)
+            val answer = a.optString("answer")
+            if (answer.isBlank() || answer == "null") {
+                continue
+            }
+            val label = questionLabels[a.optLong("question")]
+                ?: a.optString("question_identifier")
+            lines.add("$label: $answer")
+        }
+    } catch (e: JSONException) {
+        return null
+    }
+    return if (lines.isEmpty()) null else lines.joinToString("\n")
 }
 
 /**
@@ -44,13 +97,14 @@ fun searchQuestionAnswers(
         limit = 100L,
     ).executeAsList()
 
+    val disabledQuestions = conf.searchDisabledQuestions
     val secrets = mutableListOf<String>()
     for (candidate in candidates) {
         val secret = candidate.secret ?: continue
         if (secret in excludeSecrets || secret in secrets) {
             continue
         }
-        if (hasMatchingAnswer(candidate.json_data, upperQuery)) {
+        if (hasMatchingAnswer(candidate.json_data, upperQuery, disabledQuestions)) {
             secrets.add(secret)
             if (secrets.size >= 20) {
                 break
@@ -78,27 +132,30 @@ fun searchQuestionAnswers(
     return results
 }
 
-private fun hasMatchingAnswer(jsonData: String?, upperQuery: String): Boolean {
+private fun hasMatchingAnswer(jsonData: String?, upperQuery: String, disabledQuestions: Set<Long>): Boolean {
     if (jsonData == null) {
         return false
     }
     return try {
         val answers = JSONObject(jsonData).optJSONArray("answers") ?: return false
         (0 until answers.length()).any { i ->
-            answers.getJSONObject(i).optString("answer")
-                .uppercase(Locale.getDefault())
-                .contains(upperQuery)
+            val a = answers.getJSONObject(i)
+            a.optLong("question") !in disabledQuestions &&
+                    a.optString("answer")
+                        .uppercase(Locale.getDefault())
+                        .contains(upperQuery)
         }
     } catch (e: JSONException) {
         false
     }
 }
 
-class SearchListAdapter(private val results: List<TicketCheckProvider.SearchResult>, private val cb: SearchResultClickedInterface) : RecyclerView.Adapter<BindingHolder<ItemSearchresultBinding>>(), View.OnClickListener {
+class SearchListAdapter(private val results: List<SearchResultEntry>, private val cb: SearchResultClickedInterface) : RecyclerView.Adapter<BindingHolder<ItemSearchresultBinding>>(), View.OnClickListener {
     override fun onBindViewHolder(holder: BindingHolder<ItemSearchresultBinding>,
                                   position: Int) {
         val item = results.get(position)
-        holder.binding.res = item
+        holder.binding.res = item.result
+        holder.binding.answers = item.answers
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BindingHolder<ItemSearchresultBinding> {

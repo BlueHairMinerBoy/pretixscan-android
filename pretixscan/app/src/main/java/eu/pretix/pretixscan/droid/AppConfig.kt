@@ -399,6 +399,14 @@ class AppConfig(ctx: Context) : ConfigStore {
         get() = default_prefs.getBoolean(PREFS_KEY_SEARCH_DISABLE, false)
         set(value) = default_prefs.edit().putBoolean(PREFS_KEY_SEARCH_DISABLE, value).apply()
 
+    var searchDisabledQuestions: Set<Long>
+        get() = default_prefs.getStringSet(PREFS_KEY_SEARCH_DISABLED_QUESTIONS, emptySet())!!
+            .mapNotNull { it.toLongOrNull() }
+            .toSet()
+        set(value) = default_prefs.edit()
+            .putStringSet(PREFS_KEY_SEARCH_DISABLED_QUESTIONS, value.map { it.toString() }.toSet())
+            .apply()
+
     var kioskMode: Boolean
         get() = default_prefs.getBoolean(PREFS_KEY_KIOSK_MODE, false) && default_prefs.getBoolean("pref_pin_enable", false)
         set(value) = default_prefs.edit().putBoolean(PREFS_KEY_KIOSK_MODE, value).apply()
@@ -475,6 +483,7 @@ class AppConfig(ctx: Context) : ConfigStore {
         val PREFS_KEY_SOUNDS = "pref_sounds"
         val PREFS_KEY_HIDE_NAMES = "pref_hide_names"
         val PREFS_KEY_SEARCH_DISABLE = "pref_search_disable"
+        val PREFS_KEY_SEARCH_DISABLED_QUESTIONS = "pref_search_disabled_questions"
         val PREFS_KEY_KIOSK_MODE = "pref_kiosk_mode"
         val PREFS_KEY_MULTI_EVENT_MODE = "multi_event_mode"
         val PREFS_KEY_KIOSK_OOO = "pref_kiosk_out_of_order"

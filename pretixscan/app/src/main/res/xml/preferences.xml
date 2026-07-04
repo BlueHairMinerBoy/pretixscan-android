@@ -84,6 +84,10 @@
             android:defaultValue="false"
             android:key="pref_ignore_questions"
             android:title="@string/pref_ignore_questions" />
+        <Preference
+            android:key="pref_search_questions"
+            android:summary="@string/settings_summary_search_questions"
+            android:title="@string/settings_label_search_questions" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/preference_nfc_head">
         <ListPreference

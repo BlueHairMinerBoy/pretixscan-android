@@ -208,11 +208,18 @@ class MainActivity : BaseScanActivity() {
                     f,
                     sr.mapNotNull { it.secret }.toSet(),
                 )
+                val questionLabels = loadQuestionLabels(
+                    application as PretixScan,
+                    conf.eventSelectionToMap().keys,
+                )
+                val entries = results.map {
+                    SearchResultEntry(it, buildAnswersDisplay(it.position, questionLabels))
+                }
                 if (f != searchFilter) {
                     // we lost a race! Abort this.
                     return@launch
                 }
-                searchAdapter = SearchListAdapter(results, object : SearchResultClickedInterface {
+                searchAdapter = SearchListAdapter(entries, object : SearchResultClickedInterface {
                     override fun onSearchResultClicked(res: TicketCheckProvider.SearchResult) {
                         lastScanTime = System.currentTimeMillis()
                         lastScanCode = res.secret!!
@@ -230,7 +237,7 @@ class MainActivity : BaseScanActivity() {
                 })
                 runOnUiThread {
                     binding.recyclerViewSearch.adapter = searchAdapter
-                    if (results.isEmpty()) {
+                    if (entries.isEmpty()) {
                         view_data.searchState.set(WARNING)
                     } else {
                         view_data.searchState.set(SUCCESS)
