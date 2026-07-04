@@ -1,0 +1,11 @@
+searchAnswerCandidates:
+-- LIKE is case-insensitive for ASCII characters in SQLite. This is only a coarse
+-- pre-filter on the raw JSON; the caller verifies that the match is actually part
+-- of an answer to a question.
+SELECT OrderPosition.secret, OrderPosition.json_data
+FROM OrderPosition
+LEFT JOIN orders ON OrderPosition.order_ref = orders.id
+WHERE
+    OrderPosition.json_data LIKE :queryContains
+    AND orders.event_slug IN :events
+LIMIT :limit;
